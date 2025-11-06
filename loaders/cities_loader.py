@@ -1,22 +1,44 @@
-"""Loader pour le catalogue des villes"""
+"""Loader pour le catalogue des villes depuis une URL."""
 import requests
 import pandas as pd
 from io import StringIO
 from interfaces.base_interfaces import DataLoader
 
 
+
+
 class CitiesLoader(DataLoader):
-    """Responsabilité unique: Charger les données depuis l'API"""
+    """
+    Charge le catalogue des villes depuis une URL fournissant un fichier CSV.
+    """
 
-    def __init__(self):
-        self.catalog_url = "https://data.toulouse-metropole.fr/api/explore/v2.1/catalog/exports/csv?delimiter=%3B&list_separator=%2C&quote_all=false&with_bom=true"
+    def __init__(self, catalog_url: str):
+        """
+        Initialise le loader avec l'URL du catalogue.
 
-    def load_data(self):
+        Args:
+            catalog_url (str): L'URL directe vers le fichier CSV des villes.
+        """
+        self.catalog_url = catalog_url
+
+    def load_data(self) -> pd.DataFrame:
+        """
+        Charge les données depuis l'URL, les parse en CSV et les retourne en DataFrame.
+
+        Returns:
+            DataFrame: Un DataFrame contenant les données des villes.
+
+        """
         try:
+            # Réponse de la request
             response = requests.get(self.catalog_url)
+            
+            # Vérifie si la requête a réussi
             response.raise_for_status()
+
+            # Lecture du CSV depuis le texte de la réponse
             df = pd.read_csv(StringIO(response.text), sep=";")
             return df
+
         except requests.exceptions.RequestException as e:
             print(f"Erreur de connexion à l'API : {e}")
-            return pd.DataFrame()

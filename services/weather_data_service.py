@@ -1,65 +1,79 @@
-"""Service de gestion des données météo"""
-from filters.meteo_filter import MeteoFilter
-from filters.city_filter import CityFilter
-from filters.column_filter import ColumnFilter
-from filters.composite_filter import CompositeFilter
-from loaders.station_data_loader import StationDataLoader
+""" Service de façade pour simplifier l'accès et le traitement des données météo."""
+import pandas as pd
+from typing import List, Optional
+from interfaces.base_interfaces import DataLoader, DataFilter
+from extractors.data_extractor import DataExtractor
 
 
 class WeatherDataService:
     """
-    Responsabilité unique: Gérer le chargement et le filtrage des données météo
+    Ce service coordonne les loaders, filtres et extracteurs.
+    Il est configuré via l'injection de dépendances.
     """
 
-    def __init__(self, catalog_loader, extractor, column_filter=None):
+    def __init__(
+        self,
+        catalog_loader: DataLoader,
+        station_loader: DataLoader,
+        catalog_filter: DataFilter,
+        city_filter_factory,
+        column_filter: DataFilter,
+        extractor: DataExtractor
+    ):
+        """
+        Initialise le service avec toutes les dépendances nécessaires.
+
+        Args:
+            catalog_loader: Loader pour le catalogue de stations.
+            station_loader: Loader pour les données d'une station spécifique.
+            catalog_filter: Filtre à appliquer sur le catalogue brut.
+            city_filter_factory: Une fonction ou classe capable de créer un filtre de ville
+            column_filter: Filtre pour sélectionner les colonnes utiles des données de station.
+            extractor: Extracteur de données configuré.
+        """
         self.catalog_loader = catalog_loader
+        self.station_loader = station_loader
+        self.catalog_filter = catalog_filter
+        self.city_filter_factory = city_filter_factory
+        self.column_filter = column_filter
         self.extractor = extractor
-        self.column_filter = column_filter or ColumnFilter()
+        self.processed_catalog: Optional[pd.DataFrame] = None
 
-    def load_meteo_catalog(self):
-        """Charge et filtre le catalogue des stations météo"""
-        df = self.catalog_loader.load_data()
-        if df.empty:
-            return None
-
-        meteo_filter = MeteoFilter()
-        return meteo_filter.filter(df)
-
-    def get_cities(self, df):
-        """Récupère la liste des villes depuis le DataFrame"""
-        return self.extractor.get_unique_cities(df)
-
-    def get_stations_for_city(self, df, city_name):
-        """Récupère les stations pour une ville donnée"""
-        meteo_filter = MeteoFilter()
-        city_filter = CityFilter(city_name)
-        combined_filter = CompositeFilter([meteo_filter, city_filter])
-        df_filtered = combined_filter.filter(df)
-        return self.extractor.get_unique_stations(df_filtered)
-
-    def load_station_data(self, station_id):
+    def get_processed_catalog(self) -> pd.DataFrame:
         """
-        Charge les données d'une station (déjà triées par l'API)
-        Retourne un DataFrame ou None si vide
+        Charge et filtre le catalogue des stations météo.
+        Met en cache le résultat pour éviter de le recharger.
         """
-        station_loader = StationDataLoader(station_id)
-        df_station = station_loader.load_data()
+        # Mise en cache simple pour ne pas recharger à chaque fois
+        if self.processed_catalog is None:
+            raw_catalog = self.catalog_loader.load_data()
+            if raw_catalog.empty:
+                self.processed_catalog = pd.DataFrame()
+            else:
+                self.processed_catalog = self.catalog_filter.filter(raw_catalog)
 
-        if df_station.empty:
-            return None
+        return self.processed_catalog
 
-        return df_station
+    def get_cities(self) -> List[str]:
+        """Récupère la liste des villes depuis le catalogue filtré."""
+        catalog = self.get_processed_catalog()
+        return self.extractor.get_unique_cities(catalog)
 
-    def filter_station_columns(self, df):
+    def get_stations_for_city(self, city_name: str) -> List[str]:
+        """Récupère les stations pour une ville donnée à partir du catalogue filtré."""
+        catalog = self.get_processed_catalog()
+        city_filter = self.city_filter_factory(city_name) # On utilise la "fabrique"
+
+        city_specific_catalog = city_filter.filter(catalog)
+        return self.extractor.get_unique_stations(city_specific_catalog)
+
+    def get_station_data(self, station_id: str) -> pd.DataFrame:
         """
-        Applique le filtre de colonnes
-        Retourne un DataFrame filtré
+        Charge et filtre les données pour une station unique.
+        Retourne un DataFrame avec uniquement les colonnes utiles.
         """
-        if df is None or df.empty:
-            return None
+        raw_station_data = self.station_loader.load_data(station_id)
+        if raw_station_data.empty:
+            return pd.DataFrame()
 
-        return self.column_filter.filter(df)
-
-    def get_station_infos(self, df):
-        """Récupère les informations depuis le DataFrame filtré"""
-        return self.extractor.get_station_infos(df)
+        return self.column_filter.filter(raw_station_data)

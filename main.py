@@ -1,38 +1,84 @@
-"""Point d'entrée de l'application"""
-from loaders.cities_loader import CitiesLoader
+"""
+Point d'entrée de l'application.
+Responsable de la configuration et de l'assemblage des composants.
+"""
+
+# --- Imports des classes concrètes ---
+from loaders.station_data_loader import StationDataLoader
 from extractors.data_extractor import DataExtractor
+from filters.city_filter import CityFilter
+from filters.keyword_filter import KeywordFilter
 from filters.column_filter import ColumnFilter
+from filters.composite_filter import CompositeFilter
 from ui.console_ui import ConsoleUserInterface
 from services.weather_data_service import WeatherDataService
 from services.user_selection_service import UserSelectionService
 from orchestrator.weather_station_orchestrator import WeatherStationOrchestrator
+from loaders.cities_loader import CitiesLoader
+from config_loader import load_config
 
 
 def main():
-    """
-    Configuration et injection de dépendances
-    Respect du principe D (Dependency Inversion)
-    """
-    # Création des composants de base
-    catalog_loader = CitiesLoader()
+    """Charge la config, configure les composants et exécute l'application."""
+
+    # =========================================================================
+    # 1. CHARGEMENT DE LA CONFIGURATION EXTERNE
+    # =========================================================================
+    config = load_config()
+
+    # =========================================================================
+    # 2. CRÉATION ET ASSEMBLAGE DES COMPOSANTS
+    # =========================================================================
+
+    # --- Couche d'accès aux données (Loaders) ---
+    cities_loader = CitiesLoader(catalog_url=config['api']['cities_url'])
+    station_loader = StationDataLoader(api_url_template=config['api']['station_template_url'])
+
+    # --- Couche de présentation (UI) ---
     ui = ConsoleUserInterface()
-    extractor = DataExtractor()
 
-    # Création des filtres
-    column_filter = ColumnFilter()
-
-    # Création des services spécialisés (injection de dépendances)
-    data_service = WeatherDataService(
-        catalog_loader,
-        extractor,
-        column_filter
+    # --- Couche de traitement (Filtres & Extracteur) ---
+    extractor = DataExtractor(
+        city_col=config['columns']['city'],
+        station_id_col=config['columns']['station_id'],
+        timestamp_col=config['columns']['timestamp']
     )
-    selection_service = UserSelectionService(ui)
 
-    # Création de l'orchestrateur (injection de dépendances)
-    orchestrator = WeatherStationOrchestrator(data_service, selection_service, ui)
+    meteo_keyword_filter = KeywordFilter(
+        column_name=config['columns']['station_id'],
+        include_keyword=config['filters']['meteo_keyword'],
+        exclude_keyword=config['filters']['archive_keyword']
+    )
 
-    orchestrator.run_selection_workflow()
+    city_filter_factory = lambda city: CityFilter(column_name=config['columns']['city'], city_name=city)
+
+    station_data_column_filter = ColumnFilter(columns_to_keep=config['columns']['meteo_to_keep'])
+
+    catalog_processing_pipeline = CompositeFilter([meteo_keyword_filter])
+
+    # --- Couche de Services (Coordination) ---
+    data_service = WeatherDataService(
+        catalog_loader=cities_loader,
+        station_loader=station_loader,
+        catalog_filter=catalog_processing_pipeline,
+        city_filter_factory=city_filter_factory,
+        column_filter=station_data_column_filter,
+        extractor=extractor
+    )
+
+    selection_service = UserSelectionService(ui=ui)
+
+    # --- Orchestrateur ---
+    orchestrator = WeatherStationOrchestrator(
+        data_service=data_service,
+        selection_service=selection_service,
+        ui=ui
+    )
+
+    # =========================================================================
+    # 3. LANCEMENT DE L'APPLICATION
+    # =========================================================================
+    orchestrator.run()
 
 
 if __name__ == "__main__":

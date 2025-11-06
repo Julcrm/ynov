@@ -1,34 +1,55 @@
-"""Loader pour les données d'une station spécifique"""
+"""Loader pour les données de stations météo spécifiques."""
 import requests
 import pandas as pd
+from typing import Dict, Any
 from interfaces.base_interfaces import DataLoader
 
 
 class StationDataLoader(DataLoader):
-    """Responsabilité unique: Charger les données d'une station spécifique"""
+    """
+    Charge les données pour une station météo spécifique en utilisant
+    un modèle d'URL.
+    """
 
-    def __init__(self, station_id):
-        self.station_id = station_id
+    def __init__(self, api_url_template: str):
+        """
+        Initialise le loader avec un modèle d'URL.
 
-    def load_data(self):
-        """Charge les données de la station depuis l'API (triées par date décroissante)"""
-        url = f"https://data.toulouse-metropole.fr/api/explore/v2.1/catalog/datasets/{self.station_id}/records?order_by=-heure_de_paris"
+        Args:
+            api_url_template (str): 
+                Un modèle d'URL formatable qui doit contenir {station_id}.
+                Ex: "https://.../datasets/{station_id}/records"
+        """
+        self.api_url_template = api_url_template
 
+
+    def load_data(self, station_id: str) -> pd.DataFrame:
+        """
+        Charge les données pour une station météo donnée.
+
+        Args:
+            station_id (str): ID de la station à charger.
+
+        Returns:
+            DataFrame: Un DataFrame contenant les enregistrements de la station.
+        """
+        url = self.api_url_template.format(station_id=station_id)
+        
         try:
             response = requests.get(url)
             response.raise_for_status()
-
+            
             data = response.json()
 
-            if 'results' in data:
-                records = data['results']
-                if not records:
-                    print(f"Aucun enregistrement trouvé pour la station '{self.station_id}'")
-                    return pd.DataFrame()
+            records: list[Dict[str, Any]] = data.get('results', [])
 
-                df = pd.DataFrame(records)
-                return df
+            if not records:
+
+                return pd.DataFrame()
+
+            return pd.DataFrame(records)
+
 
         except requests.exceptions.RequestException as e:
+
             print(f"Erreur lors du chargement des données de la station '{self.station_id}': {e}")
-            return pd.DataFrame()
