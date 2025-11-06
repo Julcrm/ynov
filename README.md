@@ -65,7 +65,7 @@ Pour faire fonctionner ce projet, vous aurez besoin de Python 3.7+ et de quelque
         ```
 
 4.  **Installez les dépendances**
-    Cette commande installe `pandas` et `requests` (et leurs dépendances) dans votre environnement isolé.
+    Cette commande installe `pandas`, `requests`, `PyYAML`, `questionary`et `rich` (et leurs dépendances) dans votre environnement isolé.
     ```bash
     pip install -r requirements.txt
     ```
