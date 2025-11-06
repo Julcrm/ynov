@@ -25,7 +25,7 @@ Cette application console permet à un utilisateur de consulter les données mé
 ├── extractors/
 │   └── data_extractor.py
 ├── ui/
-│   └── console_ui.py
+│   └── interactive_ui.py
 ├── models/
 │   ├── station.py
 │   └── city.py
@@ -116,7 +116,7 @@ Suivez ensuite les instructions qui s'affichent dans la console pour sélectionn
 
 #### `ui/`
 
-*   `console_ui.py` : Gère **toutes les interactions avec l'utilisateur** (`print` et `input`). C'est la seule partie du code qui communique directement avec la console.
+*   `interactive_ui.py` : Gère toutes les interactions avec l'utilisateur dans la console. Elle utilise les bibliothèques `rich` et `questionary` pour créer des menus interactifs navigables au clavier et un affichage de données stylisé.
 
 #### `services/`
 

@@ -10,7 +10,7 @@ from filters.city_filter import CityFilter
 from filters.keyword_filter import KeywordFilter
 from filters.column_filter import ColumnFilter
 from filters.composite_filter import CompositeFilter
-from ui.console_ui import ConsoleUserInterface
+from ui.interactive_ui import InteractiveConsoleUI
 from services.weather_data_service import WeatherDataService
 from services.user_selection_service import UserSelectionService
 from orchestrator.weather_station_orchestrator import WeatherStationOrchestrator
@@ -35,7 +35,7 @@ def main():
     station_loader = StationDataLoader(api_url_template=config['api']['station_template_url'])
 
     # --- Couche de présentation (UI) ---
-    ui = ConsoleUserInterface()
+    ui = InteractiveConsoleUI()
 
     # --- Couche de traitement (Filtres & Extracteur) ---
     extractor = DataExtractor(
