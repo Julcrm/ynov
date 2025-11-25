@@ -67,32 +67,38 @@ class WeatherStationOrchestrator:
             self.ui.display_message("Aucune ville sélectionnée. Fin du programme.")
             return
 
-        # Étape 3: Sélectionner une station
-        stations_ids = self.data_service.get_stations_for_city(chosen_city)
-        if not stations_ids:
+        # Étape 3: Récupérer le navigateur de stations
+        station_navigator = self.data_service.get_stations_for_city(chosen_city)
+        if station_navigator.get_total() == 0:
             self.ui.display_message("Aucune station trouvée pour cette ville.")
             return
 
-        # --- AMÉLIORATION DE L'AFFICHAGE ---
-
+        # Fonction pour nettoyer l'affichage des noms de stations
         def clean_station_name(station_id: str) -> str:
             """Formate un ID de station pour un affichage plus lisible."""
-            # Cas spécial pour la dernière ligne
             if "stations-meteo-en-place" in station_id:
                 return "Catalogue général des stations (info)"
-
-            # Retire le préfixe numérique (ex: "42-")
             name_without_prefix = re.sub(r'^\d+-', '', station_id)
-            # Remplace les tirets par des espaces et met en majuscule la première lettre
             cleaned_name = name_without_prefix.replace('-', ' ').capitalize()
             return cleaned_name
 
-        # On crée la liste des noms à afficher à l'utilisateur
-        station_display_names = [clean_station_name(s_id) for s_id in stations_ids]
+        # Construire la liste des stations pour le choix initial
+        stations_list = []
+        temp_navigator = station_navigator
+        for i in range(station_navigator.get_total()):
+            current = temp_navigator.get_current()
+            if current:
+                display_name = clean_station_name(current.dataset_id)
+                stations_list.append(display_name)
+            if temp_navigator.has_next():
+                temp_navigator.next()
 
-        # On demande à l'utilisateur de choisir parmi les noms propres
+        # Réinitialiser le navigateur
+        station_navigator.reset()
+
+        # Sélection initiale de la station
         chosen_display_name = self.selection_service.select_item_from_list(
-            station_display_names,
+            stations_list,
             prompt=f"Veuillez choisir une station pour '{chosen_city}' :",
             header="SÉLECTION DE LA STATION"
         )
@@ -101,19 +107,59 @@ class WeatherStationOrchestrator:
             self.ui.display_message("Aucune station sélectionnée. Fin du programme.")
             return
 
-        # On retrouve l'ID original qui correspond au nom choisi par l'utilisateur
-        chosen_index = station_display_names.index(chosen_display_name)
-        chosen_station = stations_ids[chosen_index]
+        # Positionner le navigateur sur la station choisie
+        chosen_index = stations_list.index(chosen_display_name)
+        station_navigator.reset()
+        for _ in range(chosen_index):
+            station_navigator.next()
 
-        # Étape 4: Obtenir les données de la station (chargement + filtrage)
-        self.ui.display_header(f"CHARGEMENT DES DONNÉES POUR '{chosen_station}'")
-        station_data = self.data_service.get_station_data(chosen_station)
-        if station_data.empty:
-            self.ui.display_message("Aucune donnée disponible pour cette station.")
-            return
+        # Boucle d'affichage des données avec navigation
+        while True:
+            current_station = station_navigator.get_current()
+            if current_station is None:
+                self.ui.display_message("Erreur : aucune station courante.")
+                return
 
-        self.ui.display_message("✓ Données chargées et colonnes filtrées.")
+            # Étape 4: Charger et afficher les données de la station courante
+            position = station_navigator.get_position()
+            total = station_navigator.get_total()
+            display_name = clean_station_name(current_station.dataset_id)
 
-        # Étape 5: Afficher les données
-        self.ui.display_header("APERÇU DES DERNIÈRES DONNÉES")
-        self.ui.display_dataframe(station_data)
+            self.ui.display_header(f"STATION ({position}/{total}) : {display_name}")
+            self.ui.display_message(f"ID: {current_station.dataset_id}")
+            self.ui.display_message("Chargement des données...")
+
+            station_data = self.data_service.get_station_data(current_station.dataset_id)
+
+            if station_data.empty:
+                self.ui.display_message("⚠ Aucune donnée disponible pour cette station.")
+            else:
+                self.ui.display_message("✓ Données chargées et colonnes filtrées.")
+                self.ui.display_header("APERÇU DES DERNIÈRES DONNÉES")
+                self.ui.display_dataframe(station_data)
+
+            # Options de navigation après affichage
+            choices = []
+            if station_navigator.has_previous():
+                choices.append("← Station précédente")
+            if station_navigator.has_next():
+                choices.append("Station suivante →")
+            choices.append("⟲ Choisir une autre station")
+            choices.append("✗ Quitter")
+
+            user_choice = self.ui.prompt_for_choice(
+                choices=choices,
+                prompt="Que voulez-vous faire ?"
+            )
+
+            if user_choice == "← Station précédente":
+                station_navigator.previous()
+            elif user_choice == "Station suivante →":
+                station_navigator.next()
+            elif user_choice == "⟲ Choisir une autre station":
+                # Recommencer la sélection
+                self._execute_workflow()
+                return
+            elif user_choice == "✗ Quitter" or user_choice is None:
+                self.ui.display_message("Au revoir !")
+                return

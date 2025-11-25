@@ -1,5 +1,4 @@
 """ Ce module définit des classes de base servant d'interfaces """
-
 from typing import List
 import pandas as pd
 
@@ -7,6 +6,21 @@ class DataLoader:
     """ Classe de base pour une classe chargée de charger des données. """
     def load_data(self) -> pd.DataFrame:
 
+        raise NotImplementedError("Cette méthode doit être implémentée par la sous-classe")
+
+
+class ParameterizedDataLoader:
+    """ Classe de base pour les loaders nécessitant un identifiant. """
+    def load_data(self, identifier: str) -> pd.DataFrame:
+        """
+        Charge des données pour un identifiant spécifique.
+
+        Args:
+            identifier (str): L'identifiant de la ressource à charger.
+
+        Returns:
+            pd.DataFrame: Les données chargées.
+        """
         raise NotImplementedError("Cette méthode doit être implémentée par la sous-classe")
 
 
@@ -39,9 +53,9 @@ class UserInterface:
         """
         Demande à l'utilisateur de faire un choix parmi une liste.
 
-        Args:
-           - choices (List[str]): La liste des options proposées à l'utilisateur.
-           -  prompt (str): Le message affiché pour inviter l'utilisateur à choisir.
+        Args :
+           - choices (List[str]) : La liste des options proposées à l'utilisateur.
+           - prompt (str) : Le message affiché pour inviter l'utilisateur à choisir.
 
         Returns: Le choix qui a été sélectionné par l'utilisateur.
         """

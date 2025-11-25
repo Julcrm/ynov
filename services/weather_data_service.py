@@ -1,8 +1,11 @@
 """ Service de façade pour simplifier l'accès et le traitement des données météo."""
 import pandas as pd
 from typing import List, Optional
-from interfaces.base_interfaces import DataLoader, DataFilter
+from interfaces.base_interfaces import DataLoader, DataFilter, ParameterizedDataLoader
 from extractors.data_extractor import DataExtractor
+from models.station import Station
+from interfaces.navigation_interface import StationNavigator
+from factories.station_navigator_factory import StationNavigatorFactory
 
 
 class WeatherDataService:
@@ -14,11 +17,12 @@ class WeatherDataService:
     def __init__(
         self,
         catalog_loader: DataLoader,
-        station_loader: DataLoader,
+        station_loader: ParameterizedDataLoader,
         catalog_filter: DataFilter,
         city_filter_factory,
         column_filter: DataFilter,
-        extractor: DataExtractor
+        extractor: DataExtractor,
+        navigator_factory: StationNavigatorFactory
     ):
         """
         Initialise le service avec toutes les dépendances nécessaires.
@@ -33,6 +37,7 @@ class WeatherDataService:
         """
         self.catalog_loader = catalog_loader
         self.station_loader = station_loader
+        self.navigator_factory = navigator_factory
         self.catalog_filter = catalog_filter
         self.city_filter_factory = city_filter_factory
         self.column_filter = column_filter
@@ -59,13 +64,19 @@ class WeatherDataService:
         catalog = self.get_processed_catalog()
         return self.extractor.get_unique_cities(catalog)
 
-    def get_stations_for_city(self, city_name: str) -> List[str]:
-        """Récupère les stations pour une ville donnée à partir du catalogue filtré."""
+    def get_stations_for_city(self, city_name: str) -> StationNavigator:
+        """Récupère un navigateur de stations pour une ville donnée."""
         catalog = self.get_processed_catalog()
-        city_filter = self.city_filter_factory(city_name) # On utilise la "fabrique"
+        city_filter = self.city_filter_factory(city_name)
 
         city_specific_catalog = city_filter.filter(catalog)
-        return self.extractor.get_unique_stations(city_specific_catalog)
+        station_ids = self.extractor.get_unique_stations(city_specific_catalog)
+
+        # Créer des objets Station à partir des IDs
+        stations = [Station(station_id, city_name) for station_id in station_ids]
+
+        # Utiliser la factory pour créer le navigateur
+        return self.navigator_factory.create_from_station_list(stations)
 
     def get_station_data(self, station_id: str) -> pd.DataFrame:
         """

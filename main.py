@@ -14,6 +14,7 @@ from ui.interactive_ui import InteractiveConsoleUI
 from services.weather_data_service import WeatherDataService
 from services.user_selection_service import UserSelectionService
 from orchestrator.weather_station_orchestrator import WeatherStationOrchestrator
+from factories.station_navigator_factory import StationNavigatorFactory
 from loaders.cities_loader import CitiesLoader
 from config_loader import load_config
 
@@ -54,6 +55,8 @@ def main():
 
     station_data_column_filter = ColumnFilter(columns_to_keep=config['columns']['meteo_to_keep'])
 
+    navigator_factory = StationNavigatorFactory()
+
     catalog_processing_pipeline = CompositeFilter([meteo_keyword_filter])
 
     # --- Couche de Services (Coordination) ---
@@ -63,7 +66,8 @@ def main():
         catalog_filter=catalog_processing_pipeline,
         city_filter_factory=city_filter_factory,
         column_filter=station_data_column_filter,
-        extractor=extractor
+        extractor=extractor,
+        navigator_factory = navigator_factory
     )
 
     selection_service = UserSelectionService(ui=ui)

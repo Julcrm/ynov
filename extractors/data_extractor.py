@@ -1,6 +1,7 @@
 """ Extracteur de données configuré pour un type de DataFrame spécifique. """
-import pandas as pd
 from typing import List, Any
+import pandas as pd
+import re
 
 
 class DataExtractor:
@@ -43,24 +44,31 @@ class DataExtractor:
         # On utilise l'attribut self.timestamp_col
         if df.empty or self.timestamp_col not in df.columns:
             return []
-            
         return df[self.timestamp_col].dropna().tolist()
 
     def _extract_unique_sorted_values(self, df: pd.DataFrame, column_name: str) -> List[str]:
         """
         Méthode utilitaire pour extraire, nettoyer et trier les valeurs uniques.
-        
+        Utilise un tri naturel pour gérer correctement les nombres dans les chaînes.
+
         Args:
             df (DataFrame): Le DataFrame source.
             column_name (str): Le nom de la colonne à traiter.
 
         Returns:
-            List[str]: Une liste triée de valeurs uniques.
-            
+            List[str]: Une liste triée de valeurs uniques (tri naturel).
+
         Raises:
             KeyError: Si la colonne n'existe pas dans le DataFrame.
         """
         if column_name not in df.columns:
             raise KeyError(f"La colonne '{column_name}' est introuvable.")
-            
-        return df[column_name].dropna().drop_duplicates().sort_values().tolist()
+
+        # Extraire les valeurs uniques
+        values = df[column_name].dropna().drop_duplicates().tolist()
+
+        # Tri des résultats
+        def natural_sort_key(text):
+            return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', str(text))]
+
+        return sorted(values, key=natural_sort_key)

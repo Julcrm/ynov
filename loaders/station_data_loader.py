@@ -2,10 +2,10 @@
 import requests
 import pandas as pd
 from typing import Dict, Any
-from interfaces.base_interfaces import DataLoader
+from interfaces.base_interfaces import ParameterizedDataLoader
 
 
-class StationDataLoader(DataLoader):
+class StationDataLoader(ParameterizedDataLoader):
     """
     Charge les données pour une station météo spécifique en utilisant
     un modèle d'URL.
@@ -50,6 +50,6 @@ class StationDataLoader(DataLoader):
             return pd.DataFrame(records)
 
 
-        except requests.exceptions.RequestException as e:
-
-            print(f"Erreur lors du chargement des données de la station '{self.station_id}': {e}")
+        except requests.exceptions.RequestException:
+            # Retourne un DataFrame vide en cas d'erreur (station inexistante, 400, etc.)
+            return pd.DataFrame()
