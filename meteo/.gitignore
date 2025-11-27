@@ -1,0 +1,12 @@
+# Dossier de l'environnement virtuel
+venv/
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Fichiers système
+.DS_Store
+.idea/

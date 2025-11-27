@@ -1,0 +1,1 @@
+"""Package principal meteo pour la gestion des données météorologiques."""
