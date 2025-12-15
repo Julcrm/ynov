@@ -74,7 +74,6 @@ class CompositeFilter(DataFilter):
     def is_empty(self) -> bool:
         """
         Vérifie si la file de filtres est vide.
-
         Returns:
             bool: True si la file est vide, False sinon.
         """
