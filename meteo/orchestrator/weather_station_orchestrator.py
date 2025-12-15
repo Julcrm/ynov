@@ -4,6 +4,8 @@ import re
 from ..services.weather_data_service import WeatherDataService
 from ..services.user_selection_service import UserSelectionService
 from ..interfaces.base_interfaces import UserInterface
+from ..commands.navigation_commands import NextStationCommand, PreviousStationCommand
+from ..commands.workflow_commands import QuitCommand, RestartWorkflowCommand
 
 
 
@@ -139,27 +141,36 @@ class WeatherStationOrchestrator:
                 self.ui.display_dataframe(station_data)
 
             # Options de navigation après affichage
-            choices = []
+            # Création des commandes (Pattern Command)
+            navigation_options = {}
             if station_navigator.has_previous():
-                choices.append("← Station précédente")
+                navigation_options["← Station précédente"] = PreviousStationCommand(station_navigator)
+            
             if station_navigator.has_next():
-                choices.append("Station suivante →")
-            choices.append("⟲ Choisir une autre station")
-            choices.append("✗ Quitter")
+                navigation_options["Station suivante →"] = NextStationCommand(station_navigator)
+                
+            navigation_options["⟲ Choisir une autre station"] = RestartWorkflowCommand()
+            navigation_options["✗ Quitter"] = QuitCommand(self.ui)
 
+            choices = list(navigation_options.keys())
+            
             user_choice = self.ui.prompt_for_choice(
                 choices=choices,
                 prompt="Que voulez-vous faire ?"
             )
 
-            if user_choice == "← Station précédente":
-                station_navigator.previous()
-            elif user_choice == "Station suivante →":
-                station_navigator.next()
-            elif user_choice == "⟲ Choisir une autre station":
-                # Recommencer la sélection
-                self._execute_workflow()
+            if user_choice not in navigation_options:
+                # Cas par défaut ou None (Quitter)
+                QuitCommand(self.ui).execute()
                 return
-            elif user_choice == "✗ Quitter" or user_choice is None:
-                self.ui.display_message("Au revoir !")
+
+            command = navigation_options[user_choice]
+            should_continue = command.execute()
+
+            # Gestion spécifique pour le redémarrage (car Command.execute retourne juste un bool pour continuer ou pas la boucle locale)
+            if isinstance(command, RestartWorkflowCommand):
+                self._execute_workflow() # Récursion pour redémarrer
+                return
+            
+            if not should_continue:
                 return
